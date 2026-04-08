@@ -1,0 +1,153 @@
+# ================================
+# Go специфичные
+# ================================
+
+# Бинарники и объектные файлы
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+build/
+*.test
+*.out
+
+# Папки с зависимостями
+vendor/
+
+# Кэш Go
+*.modsum
+go.sum.bak
+
+# ================================
+# Файлы IDE
+# ================================
+
+# GoLand / IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+.history/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ================================
+# Операционные системы
+# ================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ================================
+# Конфигурация и секреты
+# ================================
+
+.env
+.env.local
+.env.*.local
+*.local.yaml
+*.local.yml
+config.yaml
+config.yml
+secrets/
+*.key
+*.pem
+*.crt
+
+# ================================
+# Данные приложения (специфично для HHRaiser)
+# ================================
+
+# Базы данных и хранилища
+*.db
+*.sqlite
+*.sqlite3
+data/
+storage/
+*.bolt
+*.badger
+
+# Cookies и сессии HH
+cookies.json
+session.json
+*.session
+
+# Логи
+*.log
+logs/
+*.log.*
+
+# Временные файлы
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# ================================
+# Специфичные для проекта
+# ================================
+
+# Кэш планировщика
+.cron.lock
+scheduler.lock
+
+# Файлы отладки
+debug/
+*.pprof
+*.trace
+
+# ================================
+# Docker и контейнеризация
+# ================================
+
+docker-compose.override.yml
+.dockerignore
+
+# ================================
+# Прочее
+# ================================
+
+# Архивы (если вдруг создаются)
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+
+# Результаты тестов и покрытия
+coverage.out
+coverage.html
+*.coverprofile
+.cache/
