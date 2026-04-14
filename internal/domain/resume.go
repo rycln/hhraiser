@@ -1,10 +1,18 @@
 package domain
 
 type Resume struct {
-	ID    string
-	Title string
+	id    string
+	title string
 }
 
 func NewResume(id, title string) *Resume {
-	return &Resume{ID: id, Title: title}
+	return &Resume{id: id, title: title}
+}
+
+func (r *Resume) GetID() string {
+	return r.id
+}
+
+func (r *Resume) GetTitle() string {
+	return r.title
 }
