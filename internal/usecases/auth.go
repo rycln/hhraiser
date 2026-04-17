@@ -7,21 +7,9 @@ import (
 	"github.com/rycln/hhraiser/internal/domain"
 )
 
-type Tokens struct {
-	XSRF  string
-	Token string
-}
-
-type LoginRequest struct {
-	Phone    string
-	Password string
-	XSRF     string
-	Token    string
-}
-
 type authGateway interface {
-	GetAnonymousTokens(context.Context) (Tokens, error)
-	Login(context.Context, LoginRequest) (*domain.Session, error)
+	GetAnonymousTokens(context.Context) (*domain.Session, error)
+	Login(context.Context, *domain.Credentials, *domain.Session) (*domain.Session, error)
 }
 
 type authSessionRepository interface {
@@ -46,22 +34,15 @@ func (uc *Auth) Authenticate(ctx context.Context, creds *domain.Credentials) err
 	ctxTokens, cancelTokens := context.WithTimeout(ctx, uc.timeout)
 	defer cancelTokens()
 
-	tokens, err := uc.gateway.GetAnonymousTokens(ctxTokens)
+	anonSession, err := uc.gateway.GetAnonymousTokens(ctxTokens)
 	if err != nil {
 		return err
-	}
-
-	req := LoginRequest{
-		Phone:    creds.GetPhone(),
-		Password: creds.GetPassword(),
-		XSRF:     tokens.XSRF,
-		Token:    tokens.Token,
 	}
 
 	ctxLogin, cancelLogin := context.WithTimeout(ctx, uc.timeout)
 	defer cancelLogin()
 
-	session, err := uc.gateway.Login(ctxLogin, req)
+	session, err := uc.gateway.Login(ctxLogin, creds, anonSession)
 	if err != nil {
 		return err
 	}
