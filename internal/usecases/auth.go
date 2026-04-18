@@ -8,44 +8,29 @@ import (
 )
 
 type authGateway interface {
-	GetAnonymousTokens(context.Context) (*domain.Session, error)
-	Login(context.Context, *domain.Credentials, *domain.Session) (*domain.Session, error)
-}
-
-type authSessionRepository interface {
-	Save(*domain.Session) error
+	Login(context.Context, *domain.Credentials) (*domain.Session, error)
 }
 
 type Auth struct {
-	sessionRepo authSessionRepository
-	gateway     authGateway
-	timeout     time.Duration
+	gateway authGateway
+	timeout time.Duration
 }
 
-func NewAuth(sessionRepo authSessionRepository, gateway authGateway, timeout time.Duration) *Auth {
+func NewAuth(gateway authGateway, timeout time.Duration) *Auth {
 	return &Auth{
-		sessionRepo: sessionRepo,
-		gateway:     gateway,
-		timeout:     timeout,
+		gateway: gateway,
+		timeout: timeout,
 	}
 }
 
-func (uc *Auth) Authenticate(ctx context.Context, creds *domain.Credentials) error {
-	ctxTokens, cancelTokens := context.WithTimeout(ctx, uc.timeout)
-	defer cancelTokens()
-
-	anonSession, err := uc.gateway.GetAnonymousTokens(ctxTokens)
-	if err != nil {
-		return err
-	}
-
+func (uc *Auth) Authenticate(ctx context.Context, creds *domain.Credentials) (*domain.Session, error) {
 	ctxLogin, cancelLogin := context.WithTimeout(ctx, uc.timeout)
 	defer cancelLogin()
 
-	session, err := uc.gateway.Login(ctxLogin, creds, anonSession)
+	session, err := uc.gateway.Login(ctxLogin, creds)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return uc.sessionRepo.Save(session)
+	return session, nil
 }
