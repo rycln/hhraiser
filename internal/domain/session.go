@@ -1,19 +1,19 @@
 package domain
 
 type Session struct {
-	xsrf  string
-	token string
+	xsrf    string
+	hhtoken string
 }
 
 func NewSession(xsrf, token string) *Session {
 	return &Session{
-		xsrf:  xsrf,
-		token: token,
+		xsrf:    xsrf,
+		hhtoken: token,
 	}
 }
 
 func (s *Session) IsAuthenticated() bool {
-	return s.xsrf != "" && s.token != ""
+	return s.xsrf != "" && s.hhtoken != ""
 }
 
 func (s *Session) GetXSRF() string {
@@ -21,5 +21,5 @@ func (s *Session) GetXSRF() string {
 }
 
 func (s *Session) GetToken() string {
-	return s.token
+	return s.hhtoken
 }
