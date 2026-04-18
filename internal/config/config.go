@@ -14,6 +14,7 @@ type Config struct {
 	Password    string `env:"HH_PASSWORD"`
 	ResumeID    string `env:"HH_RESUME_ID"`
 	ResumeTitle string `env:"HH_RESUME_TITLE"`
+	LogLevel    string `env:"LOG_LEVEL" envDefault:"info"`
 }
 
 func Load() (*Config, error) {
