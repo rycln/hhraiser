@@ -43,7 +43,7 @@ func (g *Gateway) Raise(ctx context.Context, resume *domain.Resume, session *dom
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		slog.InfoContext(ctx, "resume", resume.GetTitle(), "raised successfully")
+		slog.InfoContext(ctx, "resume raised successfully", "title", resume.GetTitle())
 		return nil
 	case http.StatusConflict:
 		return domain.ErrRaiseTooEarly
