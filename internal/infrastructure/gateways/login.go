@@ -19,6 +19,7 @@ const loginEndpoint = "/account/login"
 var (
 	errXSRFTokenRetrieval = errors.New("failed to retrieve XSRF token")
 	errHHTokenRetrieval   = errors.New("failed to retrieve HHToken")
+	errAnonymousBootstrap = errors.New("failed to bootstrap anonymous session")
 )
 
 func (g *Gateway) Login(ctx context.Context, creds *domain.Credentials) (*domain.Session, error) {
@@ -58,7 +59,7 @@ func (g *Gateway) Login(ctx context.Context, creds *domain.Credentials) (*domain
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode >= http.StatusBadRequest {
 		return nil, fmt.Errorf("login failed with status: %s", resp.Status)
 	}
 
@@ -86,6 +87,14 @@ func (g *Gateway) getAnonymousCookies(ctx context.Context) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("%w: status %s", errAnonymousBootstrap, resp.Status)
+	}
+
+	if _, ok := g.client.GetCookieValue(g.baseURL, "_xsrf"); !ok {
+		return fmt.Errorf("%w: %w", errAnonymousBootstrap, errXSRFTokenRetrieval)
+	}
 
 	return nil
 }
