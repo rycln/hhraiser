@@ -2,46 +2,40 @@ package main
 
 import (
 	"context"
-	"log"
-	"time"
+	"errors"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/rycln/hhraiser/internal/app"
 	"github.com/rycln/hhraiser/internal/config"
-	"github.com/rycln/hhraiser/internal/domain"
-	"github.com/rycln/hhraiser/internal/infrastructure/gateways"
-	"github.com/rycln/hhraiser/internal/infrastructure/httpclient"
-	"github.com/rycln/hhraiser/internal/usecases"
-)
-
-const (
-	baseURL       = "https://hh.ru"
-	reqTimeout    = 10 * time.Second
-	clientTimeout = 30 * time.Second
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	config.InitLogger(cfg.LogLevel)
 
-	client, err := httpclient.New(clientTimeout)
+	a, err := app.New(cfg)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to initialize app", "error", err)
+		os.Exit(1)
 	}
 
-	gateway := gateways.NewGateway(client, baseURL)
-	auth := usecases.NewAuth(gateway, reqTimeout)
-	raise := usecases.NewRaise(gateway, reqTimeout)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	session, err := auth.Authenticate(context.Background(), domain.NewCredentials(cfg.Phone, cfg.Password))
-	if err != nil {
-		log.Fatal(err)
+	slog.Info("hhraiser started")
+
+	if err := a.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		slog.Error("app stopped with error", "error", err)
+		os.Exit(1)
 	}
 
-	err = raise.RaiseResume(context.Background(), domain.NewResume(cfg.ResumeID, cfg.ResumeTitle), session)
-	if err != nil {
-		log.Fatal(err)
-	}
+	slog.Info("hhraiser stopped")
 }

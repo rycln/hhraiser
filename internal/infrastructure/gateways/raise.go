@@ -15,7 +15,7 @@ import (
 const raiseEndpoint = "/applicant/resumes/touch"
 
 func (g *Gateway) Raise(ctx context.Context, resume *domain.Resume, session *domain.Session) error {
-	slog.DebugContext(ctx, "attempting raise", "url", g.baseURL)
+	slog.DebugContext(ctx, "attempting raise")
 
 	fullURL, err := url.JoinPath(g.baseURL, raiseEndpoint)
 	if err != nil {
@@ -43,15 +43,30 @@ func (g *Gateway) Raise(ctx context.Context, resume *domain.Resume, session *dom
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		slog.InfoContext(ctx, "resume", resume.GetTitle(), "raised successfully")
+		slog.InfoContext(ctx, "resume raised successfully", "title", resume.GetTitle())
 		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return domain.ErrRaiseAuthRequired
 	case http.StatusConflict:
 		return domain.ErrRaiseTooEarly
 	default:
-		slog.ErrorContext(ctx, "request failed with status",
+		logAttrs := []any{
 			"status_code", resp.StatusCode,
-			"status_text", http.StatusText(resp.StatusCode))
-		return domain.ErrInvalidSession
+			"status_text", http.StatusText(resp.StatusCode),
+		}
+
+		if slog.Default().Enabled(ctx, slog.LevelDebug) {
+			bodyBytes, readErr := io.ReadAll(io.LimitReader(resp.Body, 5120))
+			if readErr != nil {
+				logAttrs = append(logAttrs, "body_read_error", readErr)
+			} else {
+				logAttrs = append(logAttrs, "body", string(bodyBytes))
+			}
+			logAttrs = append(logAttrs, "headers", resp.Header)
+		}
+
+		slog.ErrorContext(ctx, "raise request failed", logAttrs...)
+		return domain.ErrRaiseUnexpectedResponse
 	}
 }
 
