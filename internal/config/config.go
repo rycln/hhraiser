@@ -35,7 +35,7 @@ type ScheduleConfig struct {
 }
 
 type HTTPConfig struct {
-	Timeout time.Duration `env:"TIMEOUT" envDefault:"30s"`
+	Timeout time.Duration `env:"TIMEOUT" envDefault:"10s"`
 }
 
 func Load() (*Config, error) {
