@@ -51,7 +51,7 @@ func (uc *RaiseUsecase) RaiseResume(ctx context.Context, resume *domain.Resume, 
 	}
 
 	err := uc.raiseResume(ctx, resume)
-	if errors.Is(err, domain.ErrRaiseUnexpectedResponse) {
+	if errors.Is(err, domain.ErrRaiseAuthRequired) {
 		err := uc.authenticate(ctx)
 		if err != nil {
 			return err
