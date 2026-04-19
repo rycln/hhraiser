@@ -45,6 +45,8 @@ func (g *Gateway) Raise(ctx context.Context, resume *domain.Resume, session *dom
 	case http.StatusOK:
 		slog.InfoContext(ctx, "resume raised successfully", "title", resume.GetTitle())
 		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return domain.ErrRaiseAuthRequired
 	case http.StatusConflict:
 		return domain.ErrRaiseTooEarly
 	default:
