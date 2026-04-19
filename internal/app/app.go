@@ -13,11 +13,6 @@ import (
 	"github.com/rycln/hhraiser/internal/usecases"
 )
 
-const (
-	baseURL    = "https://hh.ru"
-	reqTimeout = 10 * time.Second
-)
-
 type App struct {
 	scheduler *Scheduler
 }
@@ -38,17 +33,17 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("build schedule: %w", err)
 	}
 
-	client, err := httpclient.New(cfg.HTTP.Timeout)
+	client, err := httpclient.New()
 	if err != nil {
 		return nil, fmt.Errorf("build http client: %w", err)
 	}
 
-	hhgateway := gateways.NewGateway(client, baseURL)
+	hhgateway := gateways.NewGateway(client)
 
 	creds := domain.NewCredentials(cfg.HH.Phone, cfg.HH.Password)
 	var session *domain.Session
 
-	uc := usecases.NewRaise(hhgateway, hhgateway, creds, session, reqTimeout)
+	uc := usecases.NewRaise(hhgateway, hhgateway, creds, session, cfg.HTTP.Timeout)
 
 	resume := domain.NewResume(cfg.HH.ResumeID, cfg.HH.ResumeTitle)
 
