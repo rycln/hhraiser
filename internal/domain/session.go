@@ -13,7 +13,7 @@ func NewSession(xsrf, token string) *Session {
 }
 
 func (s *Session) IsAuthenticated() bool {
-	return s.xsrf != "" && s.hhtoken != ""
+	return s != nil && s.xsrf != "" && s.hhtoken != ""
 }
 
 func (s *Session) GetXSRF() string {
