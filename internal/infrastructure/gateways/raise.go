@@ -60,9 +60,7 @@ func (g *Gateway) Raise(ctx context.Context, resume *domain.Resume, session *dom
 			} else {
 				logAttrs = append(logAttrs, "body", string(bodyBytes))
 			}
-			bodyString := string(bodyBytes)
-
-			logAttrs = append(logAttrs, "headers", resp.Header, "body", bodyString)
+			logAttrs = append(logAttrs, "headers", resp.Header)
 		}
 
 		slog.ErrorContext(ctx, "raise request failed", logAttrs...)
