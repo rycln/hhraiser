@@ -72,6 +72,10 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("SCHEDULE_JITTER must be non-negative")
 	}
 
+	if cfg.HTTP.Timeout <= 0 {
+		return fmt.Errorf("HTTP_TIMEOUT must be greater than 0")
+	}
+
 	return nil
 }
 
