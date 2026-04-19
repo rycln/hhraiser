@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"time"
 
 	"github.com/corpix/uarand"
 )
@@ -14,7 +13,7 @@ type Client struct {
 	jar        http.CookieJar
 }
 
-func New(timeout time.Duration) (*Client, error) {
+func New() (*Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -22,8 +21,7 @@ func New(timeout time.Duration) (*Client, error) {
 
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: timeout,
-			Jar:     jar,
+			Jar: jar,
 			Transport: &headerTransport{
 				base:      http.DefaultTransport,
 				userAgent: uarand.GetRandom(),
