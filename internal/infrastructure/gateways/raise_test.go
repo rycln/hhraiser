@@ -2,12 +2,15 @@ package gateways
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/rycln/hhraiser/internal/domain"
 	"github.com/rycln/hhraiser/internal/infrastructure/httpclient"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRaise_StatusCodeMapping(t *testing.T) {
@@ -43,11 +46,17 @@ func TestRaise_StatusCodeMapping(t *testing.T) {
 			session := domain.NewSession("xsrf", "token")
 
 			err = gw.Raise(context.Background(), resume, session)
-			if tt.wantError == nil && err != nil {
-				t.Fatalf("expected nil error, got %v", err)
+			if tt.wantError == nil {
+				require.NoError(t, err)
+				return
 			}
-			if tt.wantError != nil && err != tt.wantError {
-				t.Fatalf("expected error %v, got %v", tt.wantError, err)
+
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, tt.wantError))
+			if tt.status == http.StatusInternalServerError {
+				var statusErr *domain.ErrUnexpectedStatus
+				require.True(t, errors.As(err, &statusErr))
+				assert.Equal(t, http.StatusInternalServerError, statusErr.Code)
 			}
 		})
 	}
