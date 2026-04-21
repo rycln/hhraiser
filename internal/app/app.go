@@ -4,12 +4,14 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/rycln/hhraiser/internal/config"
 	"github.com/rycln/hhraiser/internal/domain"
 	"github.com/rycln/hhraiser/internal/infrastructure/gateways"
 	"github.com/rycln/hhraiser/internal/infrastructure/httpclient"
+	"github.com/rycln/hhraiser/internal/infrastructure/notifier"
 	"github.com/rycln/hhraiser/internal/usecases"
 )
 
@@ -38,12 +40,15 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("build http client: %w", err)
 	}
 
+	webhookClient := &http.Client{}
+	webhook := notifier.NewWebhook(webhookClient, cfg.Webhook.URL, cfg.Webhook.Secret)
+
 	hhgateway := gateways.NewGateway(client)
 
 	creds := domain.NewCredentials(cfg.HH.Phone, cfg.HH.Password)
 	var session *domain.Session
 
-	uc := usecases.NewRaise(hhgateway, hhgateway, creds, session, cfg.HTTP.Timeout)
+	uc := usecases.NewRaise(hhgateway, hhgateway, webhook, creds, session, cfg.HTTP.Timeout)
 
 	resume := domain.NewResume(cfg.HH.ResumeID, cfg.HH.ResumeTitle)
 
