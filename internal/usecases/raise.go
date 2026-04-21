@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/rycln/hhraiser/internal/domain"
@@ -16,21 +17,27 @@ type raiseGateway interface {
 	Raise(context.Context, *domain.Resume, *domain.Session) error
 }
 
-type RaiseUsecase struct {
-	auth    authGateway
-	raise   raiseGateway
-	creds   *domain.Credentials
-	session *domain.Session
-	timeout time.Duration
+type notifier interface {
+	Notify(ctx context.Context, event domain.RaiseEvent) error
 }
 
-func NewRaise(auth authGateway, raise raiseGateway, creds *domain.Credentials, session *domain.Session, timeout time.Duration) *RaiseUsecase {
+type RaiseUsecase struct {
+	auth     authGateway
+	raise    raiseGateway
+	notifier notifier
+	creds    *domain.Credentials
+	session  *domain.Session
+	timeout  time.Duration
+}
+
+func NewRaise(auth authGateway, raise raiseGateway, notifier notifier, creds *domain.Credentials, session *domain.Session, timeout time.Duration) *RaiseUsecase {
 	return &RaiseUsecase{
-		auth:    auth,
-		raise:   raise,
-		creds:   creds,
-		session: session,
-		timeout: timeout,
+		auth:     auth,
+		raise:    raise,
+		notifier: notifier,
+		creds:    creds,
+		session:  session,
+		timeout:  timeout,
 	}
 }
 
@@ -43,19 +50,41 @@ func (uc *RaiseUsecase) RaiseResume(ctx context.Context, resume *domain.Resume, 
 		}
 	}
 
+	err := uc.doRaise(ctx, resume)
+
+	event := domain.RaiseEvent{
+		ResumeTitle: resume.GetTitle(),
+		Success:     err == nil,
+		Timestamp:   time.Now(),
+	}
+
+	var statusErr *domain.ErrUnexpectedStatus
+	if errors.As(err, &statusErr) {
+		event.StatusCode = statusErr.Code
+	}
+
+	if notifyErr := uc.notifier.Notify(ctx, event); notifyErr != nil {
+		slog.WarnContext(ctx, "failed to send notification", "error", notifyErr)
+	}
+
+	return err
+}
+
+func (uc *RaiseUsecase) doRaise(ctx context.Context, resume *domain.Resume) error {
 	if !uc.session.IsAuthenticated() {
-		err := uc.authenticate(ctx)
-		if err != nil {
+		if err := uc.authenticate(ctx); err != nil {
 			return err
 		}
 	}
 
 	err := uc.raiseResume(ctx, resume)
 	if errors.Is(err, domain.ErrRaiseAuthRequired) {
-		err := uc.authenticate(ctx)
-		if err != nil {
+		slog.InfoContext(ctx, "re-auth attempt")
+		uc.session = nil
+		if err := uc.authenticate(ctx); err != nil {
 			return err
 		}
+
 		return uc.raiseResume(ctx, resume)
 	}
 
