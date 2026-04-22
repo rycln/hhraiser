@@ -11,11 +11,16 @@ import (
 	"github.com/rycln/hhraiser/internal/domain"
 )
 
-type webhookPayload struct {
+type raisePayload struct {
 	Event       string    `json:"event"`
 	ResumeTitle string    `json:"resume_title,omitempty"`
 	StatusCode  int       `json:"status_code,omitempty"`
 	Timestamp   time.Time `json:"timestamp"`
+}
+
+type appPayload struct {
+	Event     string    `json:"event"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type Webhook struct {
@@ -28,16 +33,27 @@ func NewWebhook(client *http.Client, url, secret string) *Webhook {
 	return &Webhook{client: client, url: url, secret: secret}
 }
 
-func (w *Webhook) Notify(ctx context.Context, event domain.RaiseEvent) error {
-	if w.url == "" {
-		return nil
-	}
-
-	payload := webhookPayload{
-		Event:       resolveEvent(event),
+func (w *Webhook) NotifyRaise(ctx context.Context, event domain.RaiseEvent) error {
+	payload := raisePayload{
+		Event:       resolveRaiseEvent(event),
 		ResumeTitle: event.ResumeTitle,
 		StatusCode:  event.StatusCode,
 		Timestamp:   event.Timestamp,
+	}
+	return w.send(ctx, payload)
+}
+
+func (w *Webhook) NotifyApp(ctx context.Context, event domain.AppEvent) error {
+	payload := appPayload{
+		Event:     event.Event,
+		Timestamp: event.Timestamp,
+	}
+	return w.send(ctx, payload)
+}
+
+func (w *Webhook) send(ctx context.Context, payload any) error {
+	if w.url == "" {
+		return nil
 	}
 
 	body, err := json.Marshal(payload)
@@ -68,7 +84,7 @@ func (w *Webhook) Notify(ctx context.Context, event domain.RaiseEvent) error {
 	return nil
 }
 
-func resolveEvent(e domain.RaiseEvent) string {
+func resolveRaiseEvent(e domain.RaiseEvent) string {
 	if e.Success {
 		return "raise_success"
 	}
