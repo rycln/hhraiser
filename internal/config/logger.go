@@ -8,7 +8,6 @@ import (
 
 var once sync.Once
 
-// InitLogger настраивает глобальный slog один раз
 func InitLogger(level string) {
 	once.Do(func() {
 		var slogLevel slog.Level

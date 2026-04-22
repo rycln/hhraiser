@@ -18,6 +18,7 @@ type Config struct {
 	HH       HHConfig       `envPrefix:"HH_"`
 	Schedule ScheduleConfig `envPrefix:"SCHEDULE_"`
 	HTTP     HTTPConfig     `envPrefix:"HTTP_"`
+	Webhook  WebhookConfig  `envPrefix:"WEBHOOK_"`
 	TZ       string         `env:"TZ"        envDefault:"UTC"`
 	LogLevel string         `env:"LOG_LEVEL" envDefault:"info"`
 }
@@ -35,7 +36,13 @@ type ScheduleConfig struct {
 }
 
 type HTTPConfig struct {
-	Timeout time.Duration `env:"TIMEOUT" envDefault:"30s"`
+	Timeout time.Duration `env:"TIMEOUT" envDefault:"10s"`
+}
+
+type WebhookConfig struct {
+	URL             string `env:"URL"`
+	Secret          string `env:"SECRET"`
+	NotifyOnSuccess bool   `env:"NOTIFY_ON_SUCCESS" envDefault:"true"`
 }
 
 func Load() (*Config, error) {

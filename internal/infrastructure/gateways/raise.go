@@ -66,7 +66,7 @@ func (g *Gateway) Raise(ctx context.Context, resume *domain.Resume, session *dom
 		}
 
 		slog.ErrorContext(ctx, "raise request failed", logAttrs...)
-		return domain.ErrRaiseUnexpectedResponse
+		return &domain.ErrUnexpectedStatus{Code: resp.StatusCode}
 	}
 }
 

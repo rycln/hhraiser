@@ -1,50 +1,72 @@
 # hhraiser
 
-Automatically raises your HeadHunter resume at scheduled times. A free alternative to the paid [Продвижение.LITE](https://hh.ru/applicant/services/payment?from=landing&package=lite) service.
+Автоматически поднимает резюме на HeadHunter в заданное время.
 
-## Features
+## Возможности
 
-- Scheduled resume raising at configurable times of day
-- Random jitter between raises to avoid anti-fraud detection
-- Timezone-aware scheduling
+- Подъём резюме по расписанию в заданные моменты времени
+- Случайная задержка перед каждым подъёмом для обхода антифрода
+- Уведомления об успехе и ошибках через webhook
+- Уведомления о запуске и остановке приложения
+- Поддержка часовых поясов
 
-## Configuration
+## Конфигурация
 
-Configuration is provided via environment variables or a `.env` file placed in the `/config` volume.
+Конфигурация задаётся через переменные окружения или файл `.env`.
 
-| Variable | Required | Default | Description |
+| Переменная | Обязательная | По умолчанию | Описание |
 |---|---|---|---|
-| `TZ` | | `UTC` | Timezone in [IANA format](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) |
-| `LOG_LEVEL` | | `info` | Log level: `debug`, `info`, `warn`, `error` |
-| `HH_PHONE` | ✓ | | HeadHunter account phone number |
-| `HH_PASSWORD` | ✓ | | HeadHunter account password |
-| `HH_RESUME_ID` | ✓ | | Resume ID to raise |
-| `HH_RESUME_TITLE` | | | Resume display name used in notifications |
-| `SCHEDULE_TIMES` | ✓ | | Comma-separated raise times in `HH:MM` format |
-| `SCHEDULE_JITTER` | | `5m` | Maximum random delay before each raise |
-| `HTTP_TIMEOUT` | | `10s` | HTTP requests timeout |
+| `TZ` | | `UTC` | Часовой пояс в формате [IANA](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) |
+| `LOG_LEVEL` | | `info` | Уровень логирования: `debug`, `info`, `warn`, `error` |
+| `HH_PHONE` | ✓ | | Номер телефона от аккаунта HeadHunter |
+| `HH_PASSWORD` | ✓ | | Пароль от аккаунта HeadHunter |
+| `HH_RESUME_ID` | ✓ | | ID резюме для подъёма |
+| `HH_RESUME_TITLE` | | | Название резюме для уведомлений |
+| `SCHEDULE_TIMES` | ✓ | | Время подъёма через запятую в формате `HH:MM` |
+| `SCHEDULE_JITTER` | | `5m` | Максимальная случайная задержка перед подъёмом |
+| `WEBHOOK_URL` | | | URL для отправки уведомлений |
+| `WEBHOOK_SECRET` | | | Bearer-токен для авторизации webhook запросов |
+| `WEBHOOK_NOTIFY_ON_SUCCESS` | | `true` | Отправлять уведомление при успешном подъёме |
+| `HTTP_TIMEOUT` | | `10s` | Таймаут HTTP запросов |
 
-### .env file
+### Файл .env
 
-As an alternative to environment variables, you can place a `.env` file in the `/config` directory:
+Вместо переменных окружения можно использовать файл `.env` в директории `/config`:
 
 ```env
 TZ=Europe/Moscow
 HH_PHONE=+79991234567
 HH_PASSWORD=your_password
 HH_RESUME_ID=abc123def456
-HH_RESUME_TITLE=Go Developer
-SCHEDULE_TIMES=10:00,14:05,18:10
+HH_RESUME_TITLE=Golang-разработчик
+SCHEDULE_TIMES=10:00,14:00,18:00
 SCHEDULE_JITTER=5m
 ```
 
-Environment variables take precedence over the `.env` file.
+Переменные окружения имеют приоритет над файлом `.env`.
 
-### Finding your Resume ID
+### Как найти ID резюме
 
-Open your resume on [hh.ru](https://hh.ru). The ID is the alphanumeric string in the URL: `https://hh.ru/resume/`**`abc123def456`**
+Откройте резюме на [hh.ru](https://hh.ru). ID — это буквенно-цифровая строка в URL: `https://hh.ru/resume/`**`abc123def456`**
 
-## Building from Source
+## Уведомления
+
+Приложение отправляет POST-запрос на `WEBHOOK_URL` в следующих случаях:
+
+- Запуск и остановка приложения
+- Успешный подъём резюме (можно отключить через `WEBHOOK_NOTIFY_ON_SUCCESS=false`)
+- Ошибка при подъёме резюме
+
+Примеры payload:
+
+```json
+{ "event": "app_started", "timestamp": "2026-04-21T10:00:00Z" }
+{ "event": "raise_success", "resume_title": "Golang-разработчик", "timestamp": "2026-04-21T10:00:05Z" }
+{ "event": "raise_failure", "resume_title": "Golang-разработчик", "status_code": 403, "timestamp": "2026-04-21T10:00:05Z" }
+{ "event": "app_stopped", "timestamp": "2026-04-21T10:00:10Z" }
+```
+
+## Сборка из исходников
 
 ```bash
 git clone https://github.com/rycln/hhraiser
@@ -52,7 +74,6 @@ cd hhraiser
 go build -o hhraiser ./cmd/hhraiser
 ```
 
-## License
+## Лицензия
 
 MIT
-

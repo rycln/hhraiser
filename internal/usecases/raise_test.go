@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/rycln/hhraiser/internal/domain"
 )
 
@@ -26,9 +29,9 @@ func (s *authGatewayStub) Login(ctx context.Context, _ *domain.Credentials) (*do
 }
 
 type raiseGatewayStub struct {
-	errs      []error
+	errs       []error
 	raiseCalls int
-	ctxs      []context.Context
+	ctxs       []context.Context
 }
 
 func (s *raiseGatewayStub) Raise(ctx context.Context, _ *domain.Resume, _ *domain.Session) error {
@@ -41,84 +44,151 @@ func (s *raiseGatewayStub) Raise(ctx context.Context, _ *domain.Resume, _ *domai
 	return nil
 }
 
-func TestRaiseResume_ReauthOnlyOnAuthError(t *testing.T) {
-	creds := domain.NewCredentials("phone", "password")
-	session := domain.NewSession("xsrf", "token")
-	resume := domain.NewResume("resume-id", "resume")
-
-	auth := &authGatewayStub{session: session}
-	raise := &raiseGatewayStub{errs: []error{domain.ErrRaiseAuthRequired, nil}}
-
-	uc := NewRaise(auth, raise, creds, session, time.Second)
-	err := uc.RaiseResume(context.Background(), resume, 0)
-	if err != nil {
-		t.Fatalf("expected success after re-auth, got error: %v", err)
-	}
-	if auth.loginCalls != 1 {
-		t.Fatalf("expected one re-auth call, got %d", auth.loginCalls)
-	}
-	if raise.raiseCalls != 2 {
-		t.Fatalf("expected two raise attempts, got %d", raise.raiseCalls)
-	}
+type notifierStub struct {
+	events []domain.RaiseEvent
+	err    error
 }
 
-func TestRaiseResume_DoesNotReauthUnexpectedError(t *testing.T) {
-	creds := domain.NewCredentials("phone", "password")
-	session := domain.NewSession("xsrf", "token")
-	resume := domain.NewResume("resume-id", "resume")
-
-	auth := &authGatewayStub{session: session}
-	raise := &raiseGatewayStub{errs: []error{domain.ErrRaiseUnexpectedResponse}}
-
-	uc := NewRaise(auth, raise, creds, session, time.Second)
-	err := uc.RaiseResume(context.Background(), resume, 0)
-	if !errors.Is(err, domain.ErrRaiseUnexpectedResponse) {
-		t.Fatalf("expected unexpected response error, got %v", err)
-	}
-	if auth.loginCalls != 0 {
-		t.Fatalf("expected no re-auth for unexpected response, got %d", auth.loginCalls)
-	}
-	if raise.raiseCalls != 1 {
-		t.Fatalf("expected one raise attempt, got %d", raise.raiseCalls)
-	}
+func (s *notifierStub) NotifyRaise(_ context.Context, event domain.RaiseEvent) error {
+	s.events = append(s.events, event)
+	return s.err
 }
 
-func TestRaiseResume_TimeoutContextsUsedForAuthAndRaise(t *testing.T) {
-	timeout := 150 * time.Millisecond
-	creds := domain.NewCredentials("phone", "password")
-	resume := domain.NewResume("resume-id", "resume")
+func TestRaiseResume(t *testing.T) {
+	t.Run("reauth only on auth error", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		session := domain.NewSession("xsrf", "token")
+		resume := domain.NewResume("resume-id", "resume")
 
-	auth := &authGatewayStub{session: domain.NewSession("xsrf", "token")}
-	raise := &raiseGatewayStub{}
+		auth := &authGatewayStub{session: session}
+		raise := &raiseGatewayStub{errs: []error{domain.ErrRaiseAuthRequired, nil}}
+		notify := &notifierStub{}
 
-	uc := NewRaise(auth, raise, creds, nil, timeout)
-	err := uc.RaiseResume(context.Background(), resume, 0)
-	if err != nil {
-		t.Fatalf("expected success, got %v", err)
-	}
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, true)
+		err := uc.RaiseResume(context.Background(), resume, 0)
 
-	if auth.loginCalls != 1 || len(auth.ctxs) != 1 {
-		t.Fatalf("expected one auth call with context, got calls=%d ctxs=%d", auth.loginCalls, len(auth.ctxs))
-	}
-	if raise.raiseCalls != 1 || len(raise.ctxs) != 1 {
-		t.Fatalf("expected one raise call with context, got calls=%d ctxs=%d", raise.raiseCalls, len(raise.ctxs))
-	}
+		require.NoError(t, err)
+		assert.Equal(t, 1, auth.loginCalls)
+		assert.Equal(t, 2, raise.raiseCalls)
+		require.Len(t, notify.events, 1)
+		assert.True(t, notify.events[0].Success)
+		assert.Equal(t, "resume", notify.events[0].ResumeTitle)
+	})
 
-	authDeadline, ok := auth.ctxs[0].Deadline()
-	if !ok {
-		t.Fatal("expected auth context with deadline")
-	}
-	raiseDeadline, ok := raise.ctxs[0].Deadline()
-	if !ok {
-		t.Fatal("expected raise context with deadline")
-	}
+	t.Run("does not reauth on unexpected error", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		session := domain.NewSession("xsrf", "token")
+		resume := domain.NewResume("resume-id", "resume")
 
-	authRemaining := time.Until(authDeadline)
-	raiseRemaining := time.Until(raiseDeadline)
-	if authRemaining <= 0 || authRemaining > timeout {
-		t.Fatalf("auth deadline should be within timeout window, remaining=%v timeout=%v", authRemaining, timeout)
-	}
-	if raiseRemaining <= 0 || raiseRemaining > timeout {
-		t.Fatalf("raise deadline should be within timeout window, remaining=%v timeout=%v", raiseRemaining, timeout)
-	}
+		auth := &authGatewayStub{session: session}
+		raise := &raiseGatewayStub{errs: []error{domain.ErrRaiseUnexpectedResponse}}
+		notify := &notifierStub{}
+
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, true)
+		err := uc.RaiseResume(context.Background(), resume, 0)
+
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrRaiseUnexpectedResponse))
+		assert.Equal(t, 0, auth.loginCalls)
+		assert.Equal(t, 1, raise.raiseCalls)
+		require.Len(t, notify.events, 1)
+		assert.False(t, notify.events[0].Success)
+	})
+
+	t.Run("sets status code on notification event for unexpected status", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		session := domain.NewSession("xsrf", "token")
+		resume := domain.NewResume("resume-id", "resume")
+
+		auth := &authGatewayStub{session: session}
+		raise := &raiseGatewayStub{errs: []error{&domain.ErrUnexpectedStatus{Code: 500}}}
+		notify := &notifierStub{}
+
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, true)
+		err := uc.RaiseResume(context.Background(), resume, 0)
+
+		require.Error(t, err)
+		require.Len(t, notify.events, 1)
+		assert.Equal(t, 500, notify.events[0].StatusCode)
+		assert.False(t, notify.events[0].Success)
+	})
+
+	t.Run("uses timeout contexts for auth and raise", func(t *testing.T) {
+		timeout := 150 * time.Millisecond
+		creds := domain.NewCredentials("phone", "password")
+		resume := domain.NewResume("resume-id", "resume")
+
+		auth := &authGatewayStub{session: domain.NewSession("xsrf", "token")}
+		raise := &raiseGatewayStub{}
+		notify := &notifierStub{}
+
+		uc := NewRaise(auth, raise, notify, creds, nil, timeout, true)
+		err := uc.RaiseResume(context.Background(), resume, 0)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, auth.loginCalls)
+		require.Len(t, auth.ctxs, 1)
+		require.Equal(t, 1, raise.raiseCalls)
+		require.Len(t, raise.ctxs, 1)
+
+		authDeadline, ok := auth.ctxs[0].Deadline()
+		require.True(t, ok)
+		raiseDeadline, ok := raise.ctxs[0].Deadline()
+		require.True(t, ok)
+
+		authRemaining := time.Until(authDeadline)
+		raiseRemaining := time.Until(raiseDeadline)
+		assert.Greater(t, authRemaining, time.Duration(0))
+		assert.LessOrEqual(t, authRemaining, timeout)
+		assert.Greater(t, raiseRemaining, time.Duration(0))
+		assert.LessOrEqual(t, raiseRemaining, timeout)
+	})
+
+	t.Run("returns context cancellation while waiting delay", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		resume := domain.NewResume("resume-id", "resume")
+		auth := &authGatewayStub{session: domain.NewSession("xsrf", "token")}
+		raise := &raiseGatewayStub{}
+		notify := &notifierStub{}
+		uc := NewRaise(auth, raise, notify, creds, nil, time.Second, true)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := uc.RaiseResume(ctx, resume, time.Second)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled))
+		assert.Equal(t, 0, auth.loginCalls)
+		assert.Equal(t, 0, raise.raiseCalls)
+		assert.Empty(t, notify.events)
+	})
+
+	t.Run("does not notify on success when notifyOnSuccess is false", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		resume := domain.NewResume("resume-id", "resume")
+		auth := &authGatewayStub{}
+		raise := &raiseGatewayStub{}
+		notify := &notifierStub{}
+		session := domain.NewSession("xsrf", "token")
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, false)
+
+		err := uc.RaiseResume(context.Background(), resume, 0)
+		require.NoError(t, err)
+		assert.Empty(t, notify.events)
+	})
+
+	t.Run("notifies on failure regardless of notifyOnSuccess flag", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		resume := domain.NewResume("resume-id", "resume")
+		auth := &authGatewayStub{}
+		raise := &raiseGatewayStub{errs: []error{&domain.ErrUnexpectedStatus{Code: 500}}}
+		notify := &notifierStub{}
+		session := domain.NewSession("xsrf", "token")
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, false)
+
+		err := uc.RaiseResume(context.Background(), resume, 0)
+		require.Error(t, err)
+		assert.Len(t, notify.events, 1)
+		assert.False(t, notify.events[0].Success)
+	})
 }
