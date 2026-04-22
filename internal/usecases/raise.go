@@ -18,7 +18,7 @@ type raiseGateway interface {
 }
 
 type notifier interface {
-	Notify(ctx context.Context, event domain.RaiseEvent) error
+	NotifyRaise(ctx context.Context, event domain.RaiseEvent) error
 }
 
 type RaiseUsecase struct {
@@ -74,7 +74,7 @@ func (uc *RaiseUsecase) RaiseResume(ctx context.Context, resume *domain.Resume, 
 	}
 
 	if err != nil || uc.notifyOnSuccess {
-		if notifyErr := uc.notifier.Notify(ctx, event); notifyErr != nil {
+		if notifyErr := uc.notifier.NotifyRaise(ctx, event); notifyErr != nil {
 			slog.WarnContext(ctx, "failed to send notification", "error", notifyErr)
 		}
 	}

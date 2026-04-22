@@ -49,7 +49,7 @@ type notifierStub struct {
 	err    error
 }
 
-func (s *notifierStub) Notify(_ context.Context, event domain.RaiseEvent) error {
+func (s *notifierStub) NotifyRaise(_ context.Context, event domain.RaiseEvent) error {
 	s.events = append(s.events, event)
 	return s.err
 }
