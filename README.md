@@ -1,5 +1,10 @@
 # hhraiser
 
+[![CI](https://github.com/rycln/hhraiser/actions/workflows/ci.yml/badge.svg)](https://github.com/rycln/hhraiser/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/rycln/hhraiser)](https://github.com/rycln/hhraiser/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/rycln/hhraiser)](go.mod)
+[![License](https://img.shields.io/github/license/rycln/hhraiser)](LICENSE)
+
 Автоматически поднимает резюме на HeadHunter в заданное время.
 
 ## Возможности
