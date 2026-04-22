@@ -8,7 +8,7 @@ services:
       - HH_PASSWORD=your_password
       - HH_RESUME_ID=abc123def456
       - HH_RESUME_TITLE=Golang-разработчик
-      - SCHEDULE_TIMES=10:00,14:00,18:00
+      - SCHEDULE_TIMES=10:00,13:00,18:00
       - SCHEDULE_JITTER=5m
       - WEBHOOK_URL=http://apprise:8000/notify
       - WEBHOOK_SECRET=your_webhook_secret

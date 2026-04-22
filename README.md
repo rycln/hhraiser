@@ -9,6 +9,31 @@
 - Уведомления об успехе и ошибках через webhook
 - Уведомления о запуске и остановке приложения
 - Поддержка часовых поясов
+- Готов к запуску в Docker
+
+## Быстрый старт
+
+```yaml
+services:
+  hhraiser:
+    image: ghcr.io/rycln/hhraiser:latest
+    container_name: hhraiser
+    environment:
+      - TZ=Europe/Moscow
+      - HH_PHONE=+79991234567
+      - HH_PASSWORD=your_password
+      - HH_RESUME_ID=abc123def456
+      - HH_RESUME_TITLE=Golang-разработчик
+      - SCHEDULE_TIMES=10:00,13:00,18:00
+      - SCHEDULE_JITTER=5m
+      - WEBHOOK_URL=http://apprise:8000/notify
+      - WEBHOOK_SECRET=your_webhook_secret
+      - WEBHOOK_NOTIFY_ON_SUCCESS=true
+      - LOG_LEVEL=info
+    volumes:
+      - ./config:/config
+    restart: unless-stopped
+```
 
 ## Конфигурация
 
@@ -39,7 +64,7 @@ HH_PHONE=+79991234567
 HH_PASSWORD=your_password
 HH_RESUME_ID=abc123def456
 HH_RESUME_TITLE=Golang-разработчик
-SCHEDULE_TIMES=10:00,14:00,18:00
+SCHEDULE_TIMES=10:00,13:00,18:00
 SCHEDULE_JITTER=5m
 ```
 
