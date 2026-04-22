@@ -1,9 +1,9 @@
-// internal/app/app.go
 package app
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -15,8 +15,13 @@ import (
 	"github.com/rycln/hhraiser/internal/usecases"
 )
 
+type appNotifier interface {
+	NotifyApp(ctx context.Context, event domain.AppEvent) error
+}
+
 type App struct {
 	scheduler *Scheduler
+	notifier  appNotifier
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -54,9 +59,25 @@ func New(cfg *config.Config) (*App, error) {
 
 	scheduler := NewScheduler(uc, resume, schedule)
 
-	return &App{scheduler: scheduler}, nil
+	return &App{scheduler: scheduler, notifier: webhook}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
-	return a.scheduler.Run(ctx)
+	a.notify(context.Background(), domain.AppEventStarted)
+
+	err := a.scheduler.Run(ctx)
+
+	a.notify(context.Background(), domain.AppEventStopped)
+
+	return err
+}
+
+func (a *App) notify(ctx context.Context, eventName string) {
+	event := domain.AppEvent{
+		Event:     eventName,
+		Timestamp: time.Now(),
+	}
+	if err := a.notifier.NotifyApp(ctx, event); err != nil {
+		slog.Warn("failed to send app notification", "event", eventName, "error", err)
+	}
 }
