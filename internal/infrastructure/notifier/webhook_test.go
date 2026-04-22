@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/rycln/hhraiser/internal/domain"
 	"github.com/stretchr/testify/assert"
@@ -27,34 +26,30 @@ func TestWebhookNotifyRaise(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("sends raise_success payload with auth header", func(t *testing.T) {
-		var gotAuth string
-		var gotPayload raisePayload
+	t.Run("sends success payload with correct fields", func(t *testing.T) {
+		var gotPayload webhookPayload
 
 		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-			gotAuth = r.Header.Get("Authorization")
 			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 			defer r.Body.Close()
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&gotPayload))
 			w.WriteHeader(http.StatusOK)
 		})
 
-		wh := NewWebhook(server.Client(), server.URL, "secret")
-		event := domain.RaiseEvent{
+		wh := NewWebhook(server.Client(), server.URL, "")
+		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{
 			ResumeTitle: "Go Resume",
 			Success:     true,
-			Timestamp:   time.Now().UTC(),
-		}
+		})
 
-		err := wh.NotifyRaise(context.Background(), event)
 		require.NoError(t, err)
-		assert.Equal(t, "Bearer secret", gotAuth)
-		assert.Equal(t, "raise_success", gotPayload.Event)
-		assert.Equal(t, "Go Resume", gotPayload.ResumeTitle)
+		assert.Equal(t, "Резюме поднято", gotPayload.Title)
+		assert.Equal(t, "Go Resume", gotPayload.Body)
+		assert.Equal(t, "success", gotPayload.Type)
 	})
 
-	t.Run("sends raise_failure payload with status code", func(t *testing.T) {
-		var gotPayload raisePayload
+	t.Run("sends failure payload without status code", func(t *testing.T) {
+		var gotPayload webhookPayload
 
 		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
@@ -63,17 +58,50 @@ func TestWebhookNotifyRaise(t *testing.T) {
 		})
 
 		wh := NewWebhook(server.Client(), server.URL, "")
-		event := domain.RaiseEvent{
+		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{
 			ResumeTitle: "Go Resume",
 			Success:     false,
-			StatusCode:  500,
-			Timestamp:   time.Now().UTC(),
-		}
+		})
 
-		err := wh.NotifyRaise(context.Background(), event)
 		require.NoError(t, err)
-		assert.Equal(t, "raise_failure", gotPayload.Event)
-		assert.Equal(t, 500, gotPayload.StatusCode)
+		assert.Equal(t, "Ошибка подъёма резюме", gotPayload.Title)
+		assert.Equal(t, "Go Resume", gotPayload.Body)
+		assert.Equal(t, "failure", gotPayload.Type)
+	})
+
+	t.Run("sends failure payload with status code in body", func(t *testing.T) {
+		var gotPayload webhookPayload
+
+		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			defer r.Body.Close()
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&gotPayload))
+			w.WriteHeader(http.StatusOK)
+		})
+
+		wh := NewWebhook(server.Client(), server.URL, "")
+		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{
+			ResumeTitle: "Go Resume",
+			Success:     false,
+			StatusCode:  403,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "failure", gotPayload.Type)
+		assert.Contains(t, gotPayload.Body, "403")
+	})
+
+	t.Run("sends auth header when secret is set", func(t *testing.T) {
+		var gotAuth string
+
+		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotAuth = r.Header.Get("Authorization")
+			w.WriteHeader(http.StatusOK)
+		})
+
+		wh := NewWebhook(server.Client(), server.URL, "secret")
+		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{Success: true})
+		require.NoError(t, err)
+		assert.Equal(t, "Bearer secret", gotAuth)
 	})
 
 	t.Run("omits auth header when secret is empty", func(t *testing.T) {
@@ -85,7 +113,7 @@ func TestWebhookNotifyRaise(t *testing.T) {
 		})
 
 		wh := NewWebhook(server.Client(), server.URL, "")
-		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{Timestamp: time.Now()})
+		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{Success: true})
 		require.NoError(t, err)
 		assert.Empty(t, gotAuth)
 	})
@@ -96,7 +124,7 @@ func TestWebhookNotifyRaise(t *testing.T) {
 		})
 
 		wh := NewWebhook(server.Client(), server.URL, "")
-		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{Timestamp: time.Now()})
+		err := wh.NotifyRaise(context.Background(), domain.RaiseEvent{Success: true})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "non-2xx")
 	})
@@ -110,7 +138,7 @@ func TestWebhookNotifyApp(t *testing.T) {
 	})
 
 	t.Run("sends app_started payload", func(t *testing.T) {
-		var gotPayload appPayload
+		var gotPayload webhookPayload
 
 		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
@@ -119,18 +147,17 @@ func TestWebhookNotifyApp(t *testing.T) {
 		})
 
 		wh := NewWebhook(server.Client(), server.URL, "")
-		event := domain.AppEvent{
-			Event:     domain.AppEventStarted,
-			Timestamp: time.Now().UTC(),
-		}
+		err := wh.NotifyApp(context.Background(), domain.AppEvent{
+			Event: domain.AppEventStarted,
+		})
 
-		err := wh.NotifyApp(context.Background(), event)
 		require.NoError(t, err)
-		assert.Equal(t, domain.AppEventStarted, gotPayload.Event)
+		assert.Equal(t, "hhraiser запущен", gotPayload.Title)
+		assert.Equal(t, "info", gotPayload.Type)
 	})
 
 	t.Run("sends app_stopped payload", func(t *testing.T) {
-		var gotPayload appPayload
+		var gotPayload webhookPayload
 
 		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
@@ -139,14 +166,13 @@ func TestWebhookNotifyApp(t *testing.T) {
 		})
 
 		wh := NewWebhook(server.Client(), server.URL, "")
-		event := domain.AppEvent{
-			Event:     domain.AppEventStopped,
-			Timestamp: time.Now().UTC(),
-		}
+		err := wh.NotifyApp(context.Background(), domain.AppEvent{
+			Event: domain.AppEventStopped,
+		})
 
-		err := wh.NotifyApp(context.Background(), event)
 		require.NoError(t, err)
-		assert.Equal(t, domain.AppEventStopped, gotPayload.Event)
+		assert.Equal(t, "hhraiser остановлен", gotPayload.Title)
+		assert.Equal(t, "info", gotPayload.Type)
 	})
 
 	t.Run("returns error on non-2xx response", func(t *testing.T) {
@@ -156,20 +182,9 @@ func TestWebhookNotifyApp(t *testing.T) {
 
 		wh := NewWebhook(server.Client(), server.URL, "")
 		err := wh.NotifyApp(context.Background(), domain.AppEvent{
-			Event:     domain.AppEventStarted,
-			Timestamp: time.Now(),
+			Event: domain.AppEventStarted,
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "non-2xx")
-	})
-}
-
-func TestResolveRaiseEvent(t *testing.T) {
-	t.Run("success resolves to raise_success", func(t *testing.T) {
-		assert.Equal(t, "raise_success", resolveRaiseEvent(domain.RaiseEvent{Success: true}))
-	})
-
-	t.Run("failure resolves to raise_failure", func(t *testing.T) {
-		assert.Equal(t, "raise_failure", resolveRaiseEvent(domain.RaiseEvent{Success: false}))
 	})
 }

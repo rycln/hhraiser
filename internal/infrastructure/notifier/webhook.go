@@ -6,21 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/rycln/hhraiser/internal/domain"
 )
 
-type raisePayload struct {
-	Event       string    `json:"event"`
-	ResumeTitle string    `json:"resume_title,omitempty"`
-	StatusCode  int       `json:"status_code,omitempty"`
-	Timestamp   time.Time `json:"timestamp"`
-}
-
-type appPayload struct {
-	Event     string    `json:"event"`
-	Timestamp time.Time `json:"timestamp"`
+type webhookPayload struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+	Type  string `json:"type"`
 }
 
 type Webhook struct {
@@ -34,24 +27,57 @@ func NewWebhook(client *http.Client, url, secret string) *Webhook {
 }
 
 func (w *Webhook) NotifyRaise(ctx context.Context, event domain.RaiseEvent) error {
-	payload := raisePayload{
-		Event:       resolveRaiseEvent(event),
-		ResumeTitle: event.ResumeTitle,
-		StatusCode:  event.StatusCode,
-		Timestamp:   event.Timestamp,
+	var payload webhookPayload
+
+	if event.Success {
+		payload = webhookPayload{
+			Title: "Резюме поднято",
+			Body:  event.ResumeTitle,
+			Type:  "success",
+		}
+	} else {
+		body := event.ResumeTitle
+		if event.StatusCode != 0 {
+			body = fmt.Sprintf("%s — код ошибки: %d", event.ResumeTitle, event.StatusCode)
+		}
+		payload = webhookPayload{
+			Title: "Ошибка подъёма резюме",
+			Body:  body,
+			Type:  "failure",
+		}
 	}
+
 	return w.send(ctx, payload)
 }
 
 func (w *Webhook) NotifyApp(ctx context.Context, event domain.AppEvent) error {
-	payload := appPayload{
-		Event:     event.Event,
-		Timestamp: event.Timestamp,
+	var payload webhookPayload
+
+	switch event.Event {
+	case domain.AppEventStarted:
+		payload = webhookPayload{
+			Title: "hhraiser запущен",
+			Body:  "Приложение успешно стартовало",
+			Type:  "info",
+		}
+	case domain.AppEventStopped:
+		payload = webhookPayload{
+			Title: "hhraiser остановлен",
+			Body:  "Приложение завершило работу",
+			Type:  "info",
+		}
+	default:
+		payload = webhookPayload{
+			Title: "hhraiser",
+			Body:  event.Event,
+			Type:  "info",
+		}
 	}
+
 	return w.send(ctx, payload)
 }
 
-func (w *Webhook) send(ctx context.Context, payload any) error {
+func (w *Webhook) send(ctx context.Context, payload webhookPayload) error {
 	if w.url == "" {
 		return nil
 	}
@@ -82,11 +108,4 @@ func (w *Webhook) send(ctx context.Context, payload any) error {
 	}
 
 	return nil
-}
-
-func resolveRaiseEvent(e domain.RaiseEvent) string {
-	if e.Success {
-		return "raise_success"
-	}
-	return "raise_failure"
 }

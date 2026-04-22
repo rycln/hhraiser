@@ -85,10 +85,10 @@ SCHEDULE_JITTER=5m
 Примеры payload:
 
 ```json
-{ "event": "app_started", "timestamp": "2026-04-21T10:00:00Z" }
-{ "event": "raise_success", "resume_title": "Golang-разработчик", "timestamp": "2026-04-21T10:00:05Z" }
-{ "event": "raise_failure", "resume_title": "Golang-разработчик", "status_code": 403, "timestamp": "2026-04-21T10:00:05Z" }
-{ "event": "app_stopped", "timestamp": "2026-04-21T10:00:10Z" }
+{ "title": "hhraiser запущен", "body": "Приложение успешно стартовало", "type": "info" }
+{ "title": "Резюме поднято", "body": "Golang-разработчик", "type": "success" }
+{ "title": "Ошибка подъёма резюме", "body": "Golang-разработчик — код ошибки: 403", "type": "failure" }
+{ "title": "hhraiser остановлен", "body": "Приложение завершило работу", "type": "info" }
 ```
 
 ## Сборка из исходников
