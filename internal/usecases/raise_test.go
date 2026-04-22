@@ -29,9 +29,9 @@ func (s *authGatewayStub) Login(ctx context.Context, _ *domain.Credentials) (*do
 }
 
 type raiseGatewayStub struct {
-	errs      []error
+	errs       []error
 	raiseCalls int
-	ctxs      []context.Context
+	ctxs       []context.Context
 }
 
 func (s *raiseGatewayStub) Raise(ctx context.Context, _ *domain.Resume, _ *domain.Session) error {
@@ -64,7 +64,7 @@ func TestRaiseResume(t *testing.T) {
 		raise := &raiseGatewayStub{errs: []error{domain.ErrRaiseAuthRequired, nil}}
 		notify := &notifierStub{}
 
-		uc := NewRaise(auth, raise, notify, creds, session, time.Second)
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, true)
 		err := uc.RaiseResume(context.Background(), resume, 0)
 
 		require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestRaiseResume(t *testing.T) {
 		raise := &raiseGatewayStub{errs: []error{domain.ErrRaiseUnexpectedResponse}}
 		notify := &notifierStub{}
 
-		uc := NewRaise(auth, raise, notify, creds, session, time.Second)
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, true)
 		err := uc.RaiseResume(context.Background(), resume, 0)
 
 		require.Error(t, err)
@@ -104,7 +104,7 @@ func TestRaiseResume(t *testing.T) {
 		raise := &raiseGatewayStub{errs: []error{&domain.ErrUnexpectedStatus{Code: 500}}}
 		notify := &notifierStub{}
 
-		uc := NewRaise(auth, raise, notify, creds, session, time.Second)
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, true)
 		err := uc.RaiseResume(context.Background(), resume, 0)
 
 		require.Error(t, err)
@@ -122,7 +122,7 @@ func TestRaiseResume(t *testing.T) {
 		raise := &raiseGatewayStub{}
 		notify := &notifierStub{}
 
-		uc := NewRaise(auth, raise, notify, creds, nil, timeout)
+		uc := NewRaise(auth, raise, notify, creds, nil, timeout, true)
 		err := uc.RaiseResume(context.Background(), resume, 0)
 		require.NoError(t, err)
 
@@ -150,7 +150,7 @@ func TestRaiseResume(t *testing.T) {
 		auth := &authGatewayStub{session: domain.NewSession("xsrf", "token")}
 		raise := &raiseGatewayStub{}
 		notify := &notifierStub{}
-		uc := NewRaise(auth, raise, notify, creds, nil, time.Second)
+		uc := NewRaise(auth, raise, notify, creds, nil, time.Second, true)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -161,5 +161,34 @@ func TestRaiseResume(t *testing.T) {
 		assert.Equal(t, 0, auth.loginCalls)
 		assert.Equal(t, 0, raise.raiseCalls)
 		assert.Empty(t, notify.events)
+	})
+
+	t.Run("does not notify on success when notifyOnSuccess is false", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		resume := domain.NewResume("resume-id", "resume")
+		auth := &authGatewayStub{}
+		raise := &raiseGatewayStub{}
+		notify := &notifierStub{}
+		session := domain.NewSession("xsrf", "token")
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, false)
+
+		err := uc.RaiseResume(context.Background(), resume, 0)
+		require.NoError(t, err)
+		assert.Empty(t, notify.events)
+	})
+
+	t.Run("notifies on failure regardless of notifyOnSuccess flag", func(t *testing.T) {
+		creds := domain.NewCredentials("phone", "password")
+		resume := domain.NewResume("resume-id", "resume")
+		auth := &authGatewayStub{}
+		raise := &raiseGatewayStub{errs: []error{&domain.ErrUnexpectedStatus{Code: 500}}}
+		notify := &notifierStub{}
+		session := domain.NewSession("xsrf", "token")
+		uc := NewRaise(auth, raise, notify, creds, session, time.Second, false)
+
+		err := uc.RaiseResume(context.Background(), resume, 0)
+		require.Error(t, err)
+		assert.Len(t, notify.events, 1)
+		assert.False(t, notify.events[0].Success)
 	})
 }

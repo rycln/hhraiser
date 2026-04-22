@@ -48,7 +48,7 @@ func New(cfg *config.Config) (*App, error) {
 	creds := domain.NewCredentials(cfg.HH.Phone, cfg.HH.Password)
 	var session *domain.Session
 
-	uc := usecases.NewRaise(hhgateway, hhgateway, webhook, creds, session, cfg.HTTP.Timeout)
+	uc := usecases.NewRaise(hhgateway, hhgateway, webhook, creds, session, cfg.HTTP.Timeout, cfg.Webhook.NotifyOnSuccess)
 
 	resume := domain.NewResume(cfg.HH.ResumeID, cfg.HH.ResumeTitle)
 

@@ -22,22 +22,32 @@ type notifier interface {
 }
 
 type RaiseUsecase struct {
-	auth     authGateway
-	raise    raiseGateway
-	notifier notifier
-	creds    *domain.Credentials
-	session  *domain.Session
-	timeout  time.Duration
+	auth            authGateway
+	raise           raiseGateway
+	notifier        notifier
+	creds           *domain.Credentials
+	session         *domain.Session
+	timeout         time.Duration
+	notifyOnSuccess bool
 }
 
-func NewRaise(auth authGateway, raise raiseGateway, notifier notifier, creds *domain.Credentials, session *domain.Session, timeout time.Duration) *RaiseUsecase {
+func NewRaise(
+	auth authGateway,
+	raise raiseGateway,
+	notifier notifier,
+	creds *domain.Credentials,
+	session *domain.Session,
+	timeout time.Duration,
+	notifyOnSuccess bool,
+) *RaiseUsecase {
 	return &RaiseUsecase{
-		auth:     auth,
-		raise:    raise,
-		notifier: notifier,
-		creds:    creds,
-		session:  session,
-		timeout:  timeout,
+		auth:            auth,
+		raise:           raise,
+		notifier:        notifier,
+		creds:           creds,
+		session:         session,
+		timeout:         timeout,
+		notifyOnSuccess: notifyOnSuccess,
 	}
 }
 
@@ -63,8 +73,10 @@ func (uc *RaiseUsecase) RaiseResume(ctx context.Context, resume *domain.Resume, 
 		event.StatusCode = statusErr.Code
 	}
 
-	if notifyErr := uc.notifier.Notify(ctx, event); notifyErr != nil {
-		slog.WarnContext(ctx, "failed to send notification", "error", notifyErr)
+	if err != nil || uc.notifyOnSuccess {
+		if notifyErr := uc.notifier.Notify(ctx, event); notifyErr != nil {
+			slog.WarnContext(ctx, "failed to send notification", "error", notifyErr)
+		}
 	}
 
 	return err

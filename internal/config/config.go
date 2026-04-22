@@ -40,8 +40,9 @@ type HTTPConfig struct {
 }
 
 type WebhookConfig struct {
-	URL    string `env:"URL"`
-	Secret string `env:"SECRET"`
+	URL             string `env:"URL"`
+	Secret          string `env:"SECRET"`
+	NotifyOnSuccess bool   `env:"NOTIFY_ON_SUCCESS" envDefault:"true"`
 }
 
 func Load() (*Config, error) {
