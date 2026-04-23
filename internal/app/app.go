@@ -29,6 +29,7 @@ func New(cfg *config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load timezone: %w", err)
 	}
+	time.Local = loc
 
 	times, err := config.ParseTimes(cfg.Schedule.Times)
 	if err != nil {
